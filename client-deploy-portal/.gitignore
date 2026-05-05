@@ -1,0 +1,35 @@
+# Environment variables
+backend/.env
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+vendor/
+backend/vendor/
+frontend/node_modules/
+
+# Laravel Storage & Logs
+storage/logs/
+storage/backups/
+backend/storage/logs/
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/storage/framework/testing/
+backend/storage/*.key
+
+# Next.js Build Output
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# IDE & OS Files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Coolify/Docker
+docker-compose.override.yml
