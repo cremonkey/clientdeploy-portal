@@ -1,0 +1,67 @@
+version: '3.8'
+services:
+  app:
+    build: { context: ./docker/app, dockerfile: Dockerfile }
+    container_name: clientdeploy-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes: ['./backend:/var/www']
+    ports: ['8000:8000']
+    depends_on: [postgres, redis]
+    networks: [clientdeploy]
+
+  frontend:
+    build: { context: ./frontend, dockerfile: Dockerfile }
+    container_name: clientdeploy-frontend
+    restart: unless-stopped
+    ports: ['3000:3000']
+    environment: ['NODE_ENV=production', 'NEXT_PUBLIC_API_URL=http://app:8000/api']
+    depends_on: [app]
+    networks: [clientdeploy]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: clientdeploy-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clientdeploy
+      POSTGRES_USER: clientdeploy
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    ports: ['5432:5432']
+    networks: [clientdeploy]
+
+  redis:
+    image: redis:7-alpine
+    container_name: clientdeploy-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-secret}
+    volumes: [redis_data:/data]
+    ports: ['6379:6379']
+    networks: [clientdeploy]
+
+  queue:
+    build: { context: ./docker/app, dockerfile: Dockerfile }
+    container_name: clientdeploy-queue
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    volumes: ['./backend:/var/www']
+    depends_on: [app, redis]
+    networks: [clientdeploy]
+
+  nginx:
+    image: nginx:alpine
+    container_name: clientdeploy-nginx
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    volumes: ['./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf', './backend/public:/var/www/public']
+    depends_on: [app, frontend]
+    networks: [clientdeploy]
+
+volumes:
+  postgres_data: { driver: local }
+  redis_data: { driver: local }
+
+networks:
+  clientdeploy: { driver: bridge }
