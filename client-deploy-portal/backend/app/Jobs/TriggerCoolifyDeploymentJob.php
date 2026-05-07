@@ -39,7 +39,8 @@ class TriggerCoolifyDeploymentJob implements ShouldQueue
             $this->project->update(['status' => 'deploying']);
 
             // Call Coolify API
-            $result = $coolify->triggerDeployment($this->project);
+$result = $coolify->triggerDeployment($this->project->coolify_application_uuid);
+
 
             if (!$result['success']) {
                 $this->deployment->markAsFailed($result['error'] ?? 'Unknown error');

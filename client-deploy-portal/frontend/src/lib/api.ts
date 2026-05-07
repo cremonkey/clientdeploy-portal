@@ -5,7 +5,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-  withCredentials: true,
+  withCredentials: false,
 });
 
 // Attach token from localStorage

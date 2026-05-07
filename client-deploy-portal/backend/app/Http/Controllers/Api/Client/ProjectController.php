@@ -126,34 +126,67 @@ class ProjectController extends Controller
         ], 202);
     }
 
-    public function deployments(Request $request, int $id): JsonResponse
-    {
-        $user = $request->user();
-        $project = Project::findOrFail($id);
 
-        if (!$user->canAccessProject($project)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+public function deployments(Project $project)
+{
+    $deployments = $project->deployments()
+        ->latest()
+        ->get();
+
+    try {
+        $coolify = app(\App\Services\CoolifyService::class);
+
+        $latest = $coolify->deploymentStatus(
+            $project->coolify_application_uuid
+        );
+
+        if (!empty($latest)) {
+
+            $latestDeployment = $deployments->first();
+
+            if ($latestDeployment) {
+
+                $status = match ($latest['status']) {
+                    'successful', 'finished', 'success' => 'success',
+                    'failed', 'error' => 'failed',
+                    'in_progress', 'running', 'queued' => 'deploying',
+                    default => 'deploying',
+                };
+
+                $latestDeployment->update([
+                    'status' => $status,
+                    'coolify_deployment_uuid' => $latest['deployment_uuid'] ?? null,
+                    'finished_at' => in_array($status, ['success', 'failed'])
+                        ? now()
+                        : null,
+                    'logs' => isset($latest['logs'])
+                        ? json_encode($latest['logs'])
+                        : null,
+                ]);
+
+                $project->update([
+                    'status' => $status,
+                    'last_deployed_at' => $status === 'success'
+                        ? now()
+                        : $project->last_deployed_at,
+                ]);
+            }
         }
 
-        $deployments = $project->deployments()
-            ->with('triggeredBy:id,name')
-            ->paginate(15)
-            ->through(fn($d) => [
-                'id' => $d->id,
-                'status' => $d->status,
-                'branch' => $d->branch,
-                'commit_hash' => $d->short_commit_hash,
-                'commit_message' => $d->commit_message,
-                'triggered_by' => $d->triggeredBy?->name,
-                'trigger_type' => $d->trigger_type,
-                'started_at' => $d->started_at?->toISOString(),
-                'finished_at' => $d->finished_at?->toISOString(),
-                'duration' => $d->formatted_duration,
-                'created_at' => $d->created_at->toISOString(),
-            ]);
-
-        return response()->json($deployments);
+    } catch (\Throwable $e) {
+        \Log::error('Deployment sync failed', [
+            'project_id' => $project->id,
+            'error' => $e->getMessage(),
+        ]);
     }
+
+    return response()->json([
+        'deployments' => $project->deployments()
+            ->latest()
+            ->get(),
+    ]);
+}
+
 
     public function logs(Request $request, int $id, CoolifyService $coolify, LogSanitizer $sanitizer): JsonResponse
     {
