@@ -26,6 +26,7 @@ class Project extends Model
     public function latestDeployment() { return $this->hasOne(Deployment::class)->latestOfMany(); }
     public function domains() { return $this->hasMany(Domain::class); }
     public function primaryDomain() { return $this->hasOne(Domain::class)->where('is_primary', true); }
+    public function environmentVariables() { return $this->hasMany(EnvironmentVariable::class); }
 
     public function scopeForClient($query, $clientId) { return $query->where('client_id', $clientId); }
     

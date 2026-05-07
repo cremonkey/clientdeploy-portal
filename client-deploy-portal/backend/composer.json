@@ -13,7 +13,8 @@
         "filament/filament": "^3.2",
         "guzzlehttp/guzzle": "^7.8",
         "spatie/laravel-permission": "^6.0",
-        "spatie/laravel-activitylog": "^4.0"
+        "spatie/laravel-activitylog": "^4.0",
+        "laravel/reverb": "^1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

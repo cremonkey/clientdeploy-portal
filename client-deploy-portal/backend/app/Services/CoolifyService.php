@@ -66,6 +66,23 @@ public function deploymentStatus(string $applicationUuid): array
         return $this->request('GET', "/deployments/applications/{$uuid}");
     }
 
+    public function getApplicationLogs(Project $project, int $lines = 200): array
+    {
+        try {
+            $response = $this->request('GET', "/applications/{$project->coolify_application_uuid}/logs?lines={$lines}");
+            
+            return [
+                'success' => true,
+                'logs' => $response['logs'] ?? $response ?? '',
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
     private function request(string $method, string $endpoint): array
     {
         $response = Http::withHeaders([

@@ -1,0 +1,17 @@
+**/node_modules
+**/vendor
+**/.git
+**/storage/*.key
+**/storage/framework/cache/data/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/storage/logs/*
+**/.next
+**/dist
+**/build
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+docker-compose.yml.backup

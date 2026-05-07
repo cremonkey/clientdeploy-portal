@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\DeploymentUpdated;
+use App\Events\LogReceived;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Deployment;
@@ -9,6 +11,11 @@ use App\Models\Project;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\DeploymentStatusMail;
+use App\Notifications\DeploymentStatusNotification;
+
+
 
 class WebhookController extends Controller
 {
@@ -29,6 +36,7 @@ class WebhookController extends Controller
         $applicationUuid = $payload['application_uuid'] ?? $payload['uuid'] ?? null;
         $deploymentUuid = $payload['deployment_uuid'] ?? null;
         $status = $payload['status'] ?? null;
+        $logs = $payload['logs'] ?? $payload['message'] ?? null;
 
         Log::info('Coolify webhook received', [
             'event' => $eventType,
@@ -69,7 +77,27 @@ class WebhookController extends Controller
                 } else {
                     $deployment->update(['status' => $mappedStatus]);
                 }
+
+                // Broadcast deployment update
+                broadcast(new DeploymentUpdated($project, $deployment));
+
+                // Send Notification for terminal states
+                if (in_array($mappedStatus, ['success', 'failed'])) {
+                    $owner = $project->client->owner;
+                    if ($owner) {
+                        $owner->notify(new DeploymentStatusNotification($project, $mappedStatus, $payload));
+                    }
+                }
             }
+        }
+
+
+
+        // Broadcast logs if available
+        if ($logs && $project) {
+            $sanitizer = app(\App\Services\LogSanitizer::class);
+            $sanitizedLog = $sanitizer->sanitize($logs);
+            broadcast(new LogReceived($project, $sanitizedLog));
         }
 
         AuditLog::log('webhook.coolify', [

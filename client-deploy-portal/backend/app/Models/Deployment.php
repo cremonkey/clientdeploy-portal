@@ -43,6 +43,11 @@ public function project()
     return $this->belongsTo(Project::class);
 }
 
+public function triggeredBy()
+{
+    return $this->belongsTo(User::class, 'triggered_by_user_id');
+}
+
 
     public function markAsRunning(?string $coolifyUuid = null): void
     {

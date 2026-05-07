@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\DeploymentUpdated;
 use App\Models\Deployment;
 use App\Models\Project;
 use App\Models\AuditLog;
@@ -38,13 +39,18 @@ class TriggerCoolifyDeploymentJob implements ShouldQueue
             $this->deployment->markAsBuilding();
             $this->project->update(['status' => 'deploying']);
 
+            // Broadcast initial state
+            broadcast(new DeploymentUpdated($this->project, $this->deployment));
+
             // Call Coolify API
-$result = $coolify->triggerDeployment($this->project->coolify_application_uuid);
+            $result = $coolify->triggerDeployment($this->project->coolify_application_uuid);
 
 
             if (!$result['success']) {
                 $this->deployment->markAsFailed($result['error'] ?? 'Unknown error');
                 $this->project->update(['status' => 'failed', 'last_deployment_status' => 'failed']);
+
+                broadcast(new DeploymentUpdated($this->project, $this->deployment));
 
                 AuditLog::log('deployment.failed', [
                     'project_id' => $this->project->id,
@@ -60,6 +66,8 @@ $result = $coolify->triggerDeployment($this->project->coolify_application_uuid);
                 'status' => 'deploying',
             ]);
 
+            broadcast(new DeploymentUpdated($this->project, $this->deployment));
+
             AuditLog::log('deployment.triggered', [
                 'project_id' => $this->project->id,
                 'description' => 'Deployment triggered successfully',
@@ -74,6 +82,8 @@ $result = $coolify->triggerDeployment($this->project->coolify_application_uuid);
 
             $this->deployment->markAsFailed($e->getMessage());
             $this->project->update(['status' => 'failed', 'last_deployment_status' => 'failed']);
+
+            broadcast(new DeploymentUpdated($this->project, $this->deployment));
 
             AuditLog::log('deployment.error', [
                 'project_id' => $this->project->id,

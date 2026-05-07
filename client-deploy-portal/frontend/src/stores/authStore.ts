@@ -16,6 +16,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   setAuth: (user: User, token: string) => void;
+  setUser: (user: User) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
   hydrate: () => void;
@@ -33,6 +34,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.setItem('portal_user', JSON.stringify(user));
     }
     set({ user, token, isAuthenticated: true, isLoading: false });
+  },
+
+  setUser: (user) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('portal_user', JSON.stringify(user));
+    }
+    set({ user });
   },
 
   clearAuth: () => {
