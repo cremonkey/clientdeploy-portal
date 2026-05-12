@@ -4,8 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Project;
-
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Deployment extends Model
 {
@@ -29,6 +28,16 @@ class Deployment extends Model
         'finished_at' => 'datetime',
     ];
 
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function triggeredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'triggered_by_user_id');
+    }
+
     public function markAsBuilding(?string $coolifyUuid = null): void
     {
         $this->update([
@@ -37,17 +46,6 @@ class Deployment extends Model
             'started_at' => now(),
         ]);
     }
-
-public function project()
-{
-    return $this->belongsTo(Project::class);
-}
-
-public function triggeredBy()
-{
-    return $this->belongsTo(User::class, 'triggered_by_user_id');
-}
-
 
     public function markAsRunning(?string $coolifyUuid = null): void
     {

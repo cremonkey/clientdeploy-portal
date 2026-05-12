@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -20,94 +19,142 @@ class DashboardController extends Controller
             'super_admin',
             'agency_admin',
             'developer',
-        ]);
+        ], true);
 
-        if ($isAdmin) {
-            $projects = Project::query()->get();
-        } else {
-            $clientId = $user->client_id;
+        $projectsQuery = Project::query();
 
-            if (!$clientId) {
-                return response()->json(['message' => 'No client associated'], 403);
+        if (!$isAdmin) {
+            if (!$user->client_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No client associated',
+                    'data' => null,
+                ], 403);
             }
 
-            $projects = Project::forClient($clientId)->get();
+            $projectsQuery->where('client_id', $user->client_id);
         }
 
+        $projects = $projectsQuery->get();
         $projectIds = $projects->pluck('id');
 
         $totalProjects = $projects->count();
-        $onlineProjects = $projects->whereIn('status', ['active', 'success', 'running'])->count();
+
+        $onlineProjects = $projects
+            ->whereIn('status', ['active', 'success', 'running', 'online'])
+            ->count();
 
         $deployments7d = Deployment::whereIn('project_id', $projectIds)
             ->where('created_at', '>=', now()->subDays(7))
             ->get();
 
-        $failedDeployments7d = $deployments7d->where('status', 'failed')->count();
-        $successDeployments7d = $deployments7d->where('status', 'success')->count();
-        
-        $successRate = $deployments7d->count() > 0 
-            ? round(($successDeployments7d / $deployments7d->count()) * 100, 1) 
+        $validDeployments7d = $deployments7d->filter(fn ($deployment) =>
+            in_array($deployment->status, ['success', 'failed'], true)
+        );
+
+        $failedDeployments7d = $validDeployments7d
+            ->where('status', 'failed')
+            ->count();
+
+        $successDeployments7d = $validDeployments7d
+            ->where('status', 'success')
+            ->count();
+
+        $successRate = $validDeployments7d->count() > 0
+            ? round(($successDeployments7d / $validDeployments7d->count()) * 100, 1)
             : 100;
 
-        $avgDuration = $deployments7d->whereNotNull('started_at')->whereNotNull('finished_at')
-            ->map(fn($d) => $d->started_at->diffInSeconds($d->finished_at))
+        $averageDuration = $validDeployments7d
+            ->filter(fn ($deployment) => $deployment->started_at && $deployment->finished_at)
+            ->map(fn ($deployment) => $deployment->started_at->diffInSeconds($deployment->finished_at))
             ->avg();
 
         $lastDeployment = Deployment::whereIn('project_id', $projectIds)
-            ->with('project:id,name')
+            ->with('project:id,name,slug')
             ->orderByDesc('created_at')
             ->first();
+
+        $recentDeployments = Deployment::whereIn('project_id', $projectIds)
+            ->with(['project:id,name,slug', 'triggeredBy:id,name'])
+            ->whereIn('id', function ($query) use ($projectIds) {
+                $query->selectRaw('MAX(id)')
+                    ->from('deployments')
+                    ->whereIn('project_id', $projectIds)
+                    ->groupBy('project_id');
+            })
+            ->orderByDesc('created_at')
+            ->limit(6)
+            ->get()
+            ->map(fn ($deployment) => [
+                'id' => $deployment->id,
+                'project_id' => $deployment->project_id,
+                'project_name' => $deployment->project?->name,
+                'project_slug' => $deployment->project?->slug,
+                'status' => $deployment->status,
+                'branch' => $deployment->branch ?? 'main',
+                'commit_hash' => $deployment->commit_hash
+                    ? substr($deployment->commit_hash, 0, 7)
+                    : null,
+                'triggered_by' => $deployment->triggeredBy?->name ?? 'System',
+                'triggered_at' => $deployment->created_at->toISOString(),
+                'duration' => $deployment->started_at && $deployment->finished_at
+                    ? $deployment->started_at->diffInSeconds($deployment->finished_at)
+                    : null,
+            ])
+            ->values();
+
+        $latestDeploymentsByProject = Deployment::whereIn('project_id', $projectIds)
+            ->whereIn('id', function ($query) use ($projectIds) {
+                $query->selectRaw('MAX(id)')
+                    ->from('deployments')
+                    ->whereIn('project_id', $projectIds)
+                    ->groupBy('project_id');
+            })
+            ->get()
+            ->keyBy('project_id');
+
+        $projectsRequiringAttention = $projects
+            ->filter(function ($project) use ($latestDeploymentsByProject) {
+                $latestDeployment = $latestDeploymentsByProject->get($project->id);
+
+                return in_array($project->status, ['failed', 'stopped', 'offline'], true)
+                    || ($latestDeployment && $latestDeployment->status === 'failed');
+            })
+            ->map(fn ($project) => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'status' => $project->status,
+                'latest_deployment_status' => $latestDeploymentsByProject->get($project->id)?->status,
+            ])
+            ->values();
 
         $openTickets = $isAdmin
             ? SupportTicket::open()->count()
             : SupportTicket::forClient($user->client_id)->open()->count();
 
-        $recentDeployments = Deployment::whereIn('project_id', $projectIds)
-            ->with(['project:id,name,slug', 'triggeredBy:id,name'])
-            ->where(function($q) {
-                $q->whereNotIn('status', ['failed'])
-                  ->orWhere('created_at', '>=', now()->subHours(48));
-            })
-            ->orderByDesc('created_at')
-            ->limit(5)
-            ->get()
-            ->map(fn($d) => [
-                'id' => $d->id,
-                'project_name' => $d->project?->name,
-                'project_slug' => $d->project?->slug,
-                'status' => $d->status,
-                'branch' => $d->branch ?? 'main',
-                'commit_hash' => $d->commit_hash ? substr($d->commit_hash, 0, 7) : null,
-                'triggered_by' => $d->triggeredBy?->name ?? 'System',
-                'triggered_at' => $d->created_at->toISOString(),
-                'duration' => $d->started_at && $d->finished_at ? $d->started_at->diffInSeconds($d->finished_at) : null,
-            ]);
-
-        $projectsRequiringAttention = $projects->whereIn('status', ['failed', 'stopped'])->map(fn($p) => [
-            'id' => $p->id,
-            'name' => $p->name,
-            'status' => $p->status,
-        ])->values();
-
         return response()->json([
-            'stats' => [
-                'total_projects' => $totalProjects,
-                'online_projects' => $onlineProjects,
-                'failed_deployments_7d' => $failedDeployments7d,
-                'open_tickets' => $openTickets,
-                'success_rate' => $successRate,
-                'avg_duration' => round($avgDuration ?? 0),
+            'success' => true,
+            'message' => 'Dashboard loaded successfully',
+            'data' => [
+                'stats' => [
+                    'total_projects' => $totalProjects,
+                    'online_projects' => $onlineProjects,
+                    'failed_deployments_7d' => $failedDeployments7d,
+                    'open_tickets' => $openTickets,
+                    'success_rate' => $successRate,
+                    'average_duration' => round($averageDuration ?? 0),
+                ],
+                'latest_deployment' => $lastDeployment ? [
+                    'id' => $lastDeployment->id,
+                    'status' => $lastDeployment->status,
+                    'project_id' => $lastDeployment->project_id,
+                    'project_name' => $lastDeployment->project?->name,
+                    'project_slug' => $lastDeployment->project?->slug,
+                    'triggered_at' => $lastDeployment->created_at->toISOString(),
+                ] : null,
+                'recent_deployments' => $recentDeployments,
+                'projects_requiring_attention' => $projectsRequiringAttention,
             ],
-            'last_deployment' => $lastDeployment ? [
-                'status' => $lastDeployment->status,
-                'project' => $lastDeployment->project?->name,
-                'time' => $lastDeployment->created_at->toISOString(),
-            ] : null,
-            'recent_deployments' => $recentDeployments,
-            'projects_requiring_attention' => $projectsRequiringAttention,
         ]);
     }
-
-
 }
