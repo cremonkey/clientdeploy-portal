@@ -86,11 +86,13 @@ class EnvironmentVariableController extends Controller
             'is_client_editable' => 'sometimes|boolean',
         ]);
 
+        $updateData = collect($validated)->except('value')->toArray();
+
         if (isset($validated['value'])) {
-            $envVar->value_encrypted = $validated['value'];
+            $updateData['value_encrypted'] = $validated['value'];
         }
-        
-        $envVar->update(collect($validated)->except('value')->toArray());
+
+        $envVar->update($updateData);
 
         return response()->json(['env_var' => $envVar]);
     }

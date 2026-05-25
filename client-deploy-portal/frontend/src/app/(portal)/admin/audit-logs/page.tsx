@@ -94,10 +94,20 @@ export default function AuditLogsPage() {
             <option value="warning">Warning</option>
             <option value="danger">Danger</option>
           </select>
-          <button 
-            onClick={() => {
-              const token = localStorage.getItem('token');
-              window.open(`${process.env.NEXT_PUBLIC_API_URL}/admin/audit-logs/export?token=${token}`, '_blank');
+          <button
+            onClick={async () => {
+              const token = localStorage.getItem('portal_token');
+              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/audit-logs/export`, {
+                headers: { Authorization: `Bearer ${token}`, Accept: 'text/csv' },
+              });
+              if (!res.ok) return;
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'audit-logs.csv';
+              a.click();
+              URL.revokeObjectURL(url);
             }}
             className="btn-secondary flex items-center gap-2 !py-2 !px-4 hover:border-brand-500/50"
           >

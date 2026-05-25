@@ -15,7 +15,7 @@ export const echo = new Echo({
   authEndpoint: `${process.env.NEXT_PUBLIC_API_URL || '/api'}/broadcasting/auth`,
   auth: {
     headers: {
-      Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage')!).state.token : '' : ''}`,
+      Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('portal_token') ?? '' : ''}`,
       Accept: 'application/json',
     },
   },

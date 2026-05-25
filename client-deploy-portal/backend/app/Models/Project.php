@@ -29,8 +29,11 @@ class Project extends Model
     public function environmentVariables() { return $this->hasMany(EnvironmentVariable::class); }
 
     public function scopeForClient($query, $clientId) { return $query->where('client_id', $clientId); }
-    
-    public function canDeploy(): bool { 
-        return in_array($this->status, ['draft', 'ready', 'running', 'failed', 'stopped']); 
+
+    // Projects that have a Coolify application UUID configured (eligible for sync)
+    public function scopeWithCoolify($query) { return $query->whereNotNull('coolify_application_uuid'); }
+
+    public function canDeploy(): bool {
+        return in_array($this->status, ['active', 'draft', 'ready', 'running', 'failed', 'stopped']);
     }
 }
