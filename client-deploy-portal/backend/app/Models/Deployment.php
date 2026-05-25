@@ -15,6 +15,8 @@ class Deployment extends Model
         'triggered_by_user_id',
         'coolify_deployment_uuid',
         'status',
+        'branch',
+        'trigger_type',
         'commit_hash',
         'commit_message',
         'logs',
@@ -64,7 +66,7 @@ class Deployment extends Model
         ]);
     }
 
-    public function markAsFailed(string $message): void
+    public function markAsFailed(?string $message = null): void
     {
         $this->update([
             'status' => 'failed',

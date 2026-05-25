@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\HealthController;
@@ -33,6 +34,9 @@ Route::prefix('auth')->group(function () {
 });
 
 
+// Required by Laravel Echo to authenticate private/presence channels
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
+
 Route::middleware(['auth:sanctum'])->prefix('client')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
@@ -60,7 +64,7 @@ Route::middleware(['auth:sanctum'])->prefix('client')->group(function () {
     Route::delete('/projects/{project}/domains/{domain}', [\App\Http\Controllers\Api\Client\DomainController::class, 'destroy']);
 });
 
-Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
     Route::get('/health/deep', [HealthController::class, 'deep']);
     
     // Clients

@@ -77,7 +77,7 @@ class ProjectController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'client_id' => 'nullable|exists:clients,id',
+            'client_id' => 'required|exists:clients,id',
             'repository_url' => 'required|string|max:1000',
             'repository_branch' => 'nullable|string|max:255',
             'branch' => 'nullable|string|max:255',
@@ -101,11 +101,7 @@ class ProjectController extends Controller
         $validated['branch'] = $validated['branch']
             ?? $validated['repository_branch'];
 
-        $validated['status'] = $validated['status'] ?? 'active';
-
-        if (empty($validated['client_id']) && property_exists($user, 'client_id')) {
-            $validated['client_id'] = $user->client_id;
-        }
+        $validated['status'] = 'active';
 
         $project = Project::create($validated);
 

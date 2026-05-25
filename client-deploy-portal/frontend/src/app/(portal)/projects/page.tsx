@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useAuthStore } from '@/stores/authStore';
 import { projectsApi } from '@/lib/api';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -45,7 +46,11 @@ interface Project {
   can_deploy: boolean;
 }
 
+const ADMIN_ROLES = ['super_admin', 'agency_admin'];
+
 export default function ProjectsPage() {
+  const { user } = useAuthStore();
+  const canCreateProject = user ? ADMIN_ROLES.includes(user.role) : false;
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState<number | null>(null);
@@ -210,10 +215,12 @@ export default function ProjectsPage() {
             </button>
           </div>
 
-          <Link href="/projects/new" className="btn-primary flex items-center gap-2 px-6 h-11">
-            <Plus className="h-4 w-4" />
-            New Project
-          </Link>
+          {canCreateProject && (
+            <Link href="/projects/new" className="btn-primary flex items-center gap-2 px-6 h-11">
+              <Plus className="h-4 w-4" />
+              New Project
+            </Link>
+          )}
         </div>
       </div>
 
@@ -530,7 +537,7 @@ export default function ProjectsPage() {
               : 'Your workspace is empty. Create your first project to get started.'}
           </p>
 
-          {!search && (
+          {!search && canCreateProject && (
             <Link href="/projects/new" className="btn-primary inline-flex items-center gap-2 px-8 mt-6">
               <Plus className="h-4 w-4" />
               Create Project

@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Models\Deployment;
 use App\Models\Project;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -15,13 +16,13 @@ class DeploymentUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $project;
-    public $deployment;
+    public Project $project;
+    public Deployment $deployment;
 
-    public function __construct(Project $project, array $deployment)
+    public function __construct(Deployment $deployment)
     {
-        $this->project = $project;
         $this->deployment = $deployment;
+        $this->project = $deployment->project;
     }
 
     public function broadcastOn(): array
@@ -35,8 +36,8 @@ class DeploymentUpdated implements ShouldBroadcast
     {
         return [
             'id' => $this->project->id,
-            'status' => $this->deployment['status'] ?? 'unknown',
-            'deployment' => $this->deployment,
+            'status' => $this->deployment->status ?? 'unknown',
+            'deployment' => $this->deployment->toArray(),
         ];
     }
 }
